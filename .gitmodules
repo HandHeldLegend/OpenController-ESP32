@@ -1,0 +1,6 @@
+[submodule "components/esp32-neopixel"]
+	path = components/esp32-neopixel
+	url = https://github.com/HandHeldLegend/esp32-neopixel
+[submodule "components/HOJA-LIB-ESP32"]
+	path = components/HOJA-LIB-ESP32
+	url = https://github.com/HandHeldLegend/HOJA-LIB-ESP32
