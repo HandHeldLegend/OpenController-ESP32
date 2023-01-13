@@ -74,7 +74,7 @@ uint32_t regread_high = 0;
 bool     local_start_pressed = false;
 
 // Variable to hold current color data
-rgb_s led_colors[CONFIG_HOJA_RGB_COUNT] = {0};
+rgb_s led_colors[CONFIG_NP_RGB_COUNT] = {0};
 
 // LED boot animation
 void boot_anim()
@@ -98,15 +98,15 @@ void boot_anim()
                 color_last_idx = color_idx;
             }
             back_forth += 1;
-            if (back_forth == CONFIG_HOJA_RGB_COUNT)
+            if (back_forth == CONFIG_NP_RGB_COUNT)
             {
                 toggle = true;
-                back_forth = CONFIG_HOJA_RGB_COUNT-1;
+                back_forth = CONFIG_NP_RGB_COUNT-1;
             }
         }
         else
         {
-            if (back_forth < CONFIG_HOJA_RGB_COUNT-1)
+            if (back_forth < CONFIG_NP_RGB_COUNT-1)
             {
                 led_colors[back_forth+1] = colors[color_last_idx];
                 color_last_idx = color_idx;
@@ -147,7 +147,7 @@ void boot_anim()
         rgb_show();
         vTaskDelay(100/portTICK_PERIOD_MS);
     }
-    rgb_setall(COLOR_BLACK, led_colors);
+    rgb_setall(COLOR_BLACK);
     rgb_show();
 }
 
@@ -182,7 +182,7 @@ void enter_reboot()
 // Sleep mode should check the charge level every 30 seconds or so. 
 void enter_sleep()
 {
-    rgb_setall(COLOR_BLACK, led_colors);
+    rgb_setall(COLOR_BLACK);
     rgb_show();
 
     util_battery_enable_ship_mode();
@@ -392,14 +392,14 @@ void local_wired_evt(hoja_wired_event_t evt)
         
         case HEVT_WIRED_SNES_DETECT:
             hoja_set_core(HOJA_CORE_SNES);
-            rgb_setall(COLOR_YELLOW, led_colors);
+            rgb_setall(COLOR_YELLOW);
             err = hoja_start_core();
 
             break;
 
         case HEVT_WIRED_JOYBUS_DETECT:
             hoja_set_core(HOJA_CORE_GC);
-            rgb_setall(COLOR_PURPLE, led_colors);
+            rgb_setall(COLOR_PURPLE);
             err = hoja_start_core();
 
             break;
@@ -495,7 +495,7 @@ void local_boot_evt(hoja_boot_event_t evt)
 
             if (err == HOJA_OK)
             {
-                rgb_setall(COLOR_GREEN, led_colors);
+                rgb_setall(COLOR_GREEN);
                 rgb_show();
             }
             
@@ -583,7 +583,7 @@ void app_main()
 
     util_i2c_initialize();
     util_battery_set_type(BATTYPE_BQ25180);
-    util_rgb_init(led_colors, RGB_MODE_GRB);
+    neopixel_init(led_colors, SPI3_HOST);
     rgb_setbrightness(100);
 
     hoja_register_button_callback(local_button_cb);
