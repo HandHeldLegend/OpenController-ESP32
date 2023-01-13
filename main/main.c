@@ -467,7 +467,7 @@ void local_boot_evt(hoja_boot_event_t evt)
                 ESP_LOGI(TAG, "Plugged in.");
             }
 
-            loaded_settings.controller_mode = HOJA_CONTROLLER_MODE_NS;
+            loaded_settings.controller_mode = HOJA_CONTROLLER_MODE_RETRO;
 
             switch(loaded_settings.controller_mode)
             {
