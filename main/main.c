@@ -392,14 +392,14 @@ void local_wired_evt(hoja_wired_event_t evt)
         
         case HEVT_WIRED_SNES_DETECT:
             hoja_set_core(HOJA_CORE_SNES);
-            rgb_setall(COLOR_YELLOW);
+            rgb_setall(COLOR_RED);
             err = hoja_start_core();
 
             break;
 
         case HEVT_WIRED_JOYBUS_DETECT:
             hoja_set_core(HOJA_CORE_GC);
-            rgb_setall(COLOR_PURPLE);
+            rgb_setall(COLOR_PINK);
             err = hoja_start_core();
 
             break;
@@ -465,39 +465,100 @@ void local_boot_evt(hoja_boot_event_t evt)
             if (evt == HEVT_BOOT_PLUGGED)
             {
                 ESP_LOGI(TAG, "Plugged in.");
-            }   
+            }
+
+            loaded_settings.controller_mode = HOJA_CONTROLLER_MODE_NS;
+
+            switch(loaded_settings.controller_mode)
+            {
+                case HOJA_CONTROLLER_MODE_RETRO:
+                    err = util_wired_detect_loop();
+                    if (!err)
+                    {
+                        ESP_LOGI(TAG, "Started wired retro loop OK.");
+                        rgb_setall(COLOR_ORANGE);
+                        rgb_show();
+                    }
+                    else
+                    {
+                        ESP_LOGE(TAG, "Failed to start wired retro loop.");
+                    }
+                    break;
+                
+                default:
+                case HOJA_CONTROLLER_MODE_DINPUT:
+                    hoja_set_core(HOJA_CORE_USB);
+                    core_usb_set_subcore(USB_SUBCORE_DINPUT);
+
+                    err = hoja_start_core();
+
+                    if (err == HOJA_OK)
+                    {
+                        rgb_setall(COLOR_BLUE);
+                        rgb_show();
+                    }
+
+                    break;
+
+                case HOJA_CONTROLLER_MODE_XINPUT:
+                    hoja_set_core(HOJA_CORE_USB);
+                    core_usb_set_subcore(USB_SUBCORE_XINPUT);
+
+                    err = hoja_start_core();
+
+                    if (err == HOJA_OK)
+                    {
+                        rgb_setall(COLOR_GREEN);
+                        rgb_show();
+                    }
+
+                    break;
+                
+                case HOJA_CONTROLLER_MODE_NS:
+                    /*
+                    hoja_set_core(HOJA_CORE_USB);
+                    core_usb_set_subcore(USB_SUBCORE_NS);
+
+                    err = hoja_start_core();
+
+                    if (err == HOJA_OK)
+                    {
+                        rgb_setall(COLOR_YELLOW);
+                        rgb_show();
+                    }
+                    */
+
+                    core_ns_set_subcore(NS_TYPE_SNES);
+                    hoja_set_core(HOJA_CORE_NS);
+
+                    err = hoja_start_core();
+
+                    if (err == HOJA_OK)
+                    {
+                        rgb_setall(COLOR_YELLOW);
+                        led_colors[0].rgb = COLOR_BLUE.rgb;
+                        led_colors[2].rgb = COLOR_BLUE.rgb;
+                        rgb_show();
+                    }
+
+                    break;
+            }
+
             /*if (loaded_settings.controller_mode == HOJA_CONTROLLER_MODE_RETRO)
             {
                 
             }
-            err = util_wired_detect_loop();
-            if (!err)
-            {
-                ESP_LOGI(TAG, "Started wired retro loop OK.");
-                rgb_setall(COLOR_RED, led_colors);
-                rgb_show();
-            }
-            else
-            {
-                ESP_LOGE(TAG, "Failed to start wired retro loop.");
-            }*/
+            */
 
             // USB test
             /*
-            hoja_set_core(HOJA_CORE_USB);
-            core_usb_set_subcore(USB_SUBCORE_XINPUT);
+            
             */
 
             // BT DInput test
             hoja_set_core(HOJA_CORE_BT_DINPUT);
 
-            err = hoja_start_core();
-
-            if (err == HOJA_OK)
-            {
-                rgb_setall(COLOR_GREEN);
-                rgb_show();
-            }
+            
             
 
             break;
