@@ -467,7 +467,7 @@ void local_boot_evt(hoja_boot_event_t evt)
                 ESP_LOGI(TAG, "Plugged in.");
             }
 
-            loaded_settings.controller_mode = HOJA_CONTROLLER_MODE_RETRO;
+            loaded_settings.controller_mode = HOJA_CONTROLLER_MODE_NS;
 
             switch(loaded_settings.controller_mode)
             {
@@ -528,7 +528,7 @@ void local_boot_evt(hoja_boot_event_t evt)
                     }
                     */
 
-                    core_ns_set_subcore(NS_TYPE_SNES);
+                    core_ns_set_subcore(NS_TYPE_N64);
                     hoja_set_core(HOJA_CORE_NS);
 
                     err = hoja_start_core();
@@ -541,25 +541,20 @@ void local_boot_evt(hoja_boot_event_t evt)
                         rgb_show();
                     }
 
+                    vTaskDelay(5000/portTICK_PERIOD_MS);
+
+                    hoja_stop_core();
+
+                    err = hoja_start_core();
+
+                    if (err == HOJA_OK)
+                    {
+                        rgb_setall(COLOR_GREEN);
+                        rgb_show();
+                    }
+
                     break;
             }
-
-            /*if (loaded_settings.controller_mode == HOJA_CONTROLLER_MODE_RETRO)
-            {
-                
-            }
-            */
-
-            // USB test
-            /*
-            
-            */
-
-            // BT DInput test
-            hoja_set_core(HOJA_CORE_BT_DINPUT);
-
-            
-            
 
             break;
 
@@ -644,7 +639,7 @@ void app_main()
 
     util_i2c_initialize();
     util_battery_set_type(BATTYPE_BQ25180);
-    neopixel_init(led_colors, SPI3_HOST);
+    neopixel_init(led_colors, VSPI_HOST);
     rgb_setbrightness(100);
 
     hoja_register_button_callback(local_button_cb);
