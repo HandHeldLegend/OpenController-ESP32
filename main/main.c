@@ -467,7 +467,7 @@ void local_boot_evt(hoja_boot_event_t evt)
                 ESP_LOGI(TAG, "Plugged in.");
             }
 
-            loaded_settings.controller_mode = HOJA_CONTROLLER_MODE_NS;
+            loaded_settings.controller_mode = HOJA_CONTROLLER_MODE_RETRO;
 
             switch(loaded_settings.controller_mode)
             {
@@ -640,7 +640,7 @@ void app_main()
     util_i2c_initialize();
     util_battery_set_type(BATTYPE_BQ25180);
     neopixel_init(led_colors, VSPI_HOST);
-    rgb_setbrightness(100);
+    rgb_setbrightness(25);
 
     hoja_register_button_callback(local_button_cb);
     hoja_register_analog_callback(local_analog_cb);
