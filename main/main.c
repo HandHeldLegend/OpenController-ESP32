@@ -324,11 +324,35 @@ void local_system_evt(hoja_system_event_t evt)
             local_button_cb(&hoja_button_data);
 
             // Check to see what buttons are being held. Adjust state accordingly.
-            if (hoja_button_data.button_start)
+            if (hoja_button_data.button_left)
             {
                 if (loaded_settings.controller_mode != HOJA_CONTROLLER_MODE_RETRO)
                 {
                     loaded_settings.controller_mode = HOJA_CONTROLLER_MODE_RETRO;
+                    hoja_settings_saveall();
+                }
+            }
+            else if (hoja_button_data.button_right)
+            {
+                if (loaded_settings.controller_mode != HOJA_CONTROLLER_MODE_NS)
+                {
+                    loaded_settings.controller_mode = HOJA_CONTROLLER_MODE_NS;
+                    hoja_settings_saveall();
+                }
+            }
+            else if (hoja_button_data.button_up)
+            {
+                if (loaded_settings.controller_mode != HOJA_CONTROLLER_MODE_XINPUT)
+                {
+                    loaded_settings.controller_mode = HOJA_CONTROLLER_MODE_XINPUT;
+                    hoja_settings_saveall();
+                }
+            }
+            else if (hoja_button_data.button_down)
+            {
+                if (loaded_settings.controller_mode != HOJA_CONTROLLER_MODE_DINPUT)
+                {
+                    loaded_settings.controller_mode = HOJA_CONTROLLER_MODE_DINPUT;
                     hoja_settings_saveall();
                 }
             }
@@ -392,7 +416,7 @@ void local_wired_evt(hoja_wired_event_t evt)
         
         case HEVT_WIRED_SNES_DETECT:
             hoja_set_core(HOJA_CORE_SNES);
-            rgb_setall(COLOR_RED);
+            rgb_setall(COLOR_PURPLE);
             err = hoja_start_core();
 
             break;
@@ -467,8 +491,6 @@ void local_boot_evt(hoja_boot_event_t evt)
                 ESP_LOGI(TAG, "Plugged in.");
             }
 
-            loaded_settings.controller_mode = HOJA_CONTROLLER_MODE_RETRO;
-
             switch(loaded_settings.controller_mode)
             {
                 case HOJA_CONTROLLER_MODE_RETRO:
@@ -515,7 +537,7 @@ void local_boot_evt(hoja_boot_event_t evt)
                     break;
                 
                 case HOJA_CONTROLLER_MODE_NS:
-                    /*
+
                     hoja_set_core(HOJA_CORE_USB);
                     core_usb_set_subcore(USB_SUBCORE_NS);
 
@@ -524,32 +546,8 @@ void local_boot_evt(hoja_boot_event_t evt)
                     if (err == HOJA_OK)
                     {
                         rgb_setall(COLOR_YELLOW);
-                        rgb_show();
-                    }
-                    */
-
-                    core_ns_set_subcore(NS_TYPE_N64);
-                    hoja_set_core(HOJA_CORE_NS);
-
-                    err = hoja_start_core();
-
-                    if (err == HOJA_OK)
-                    {
-                        rgb_setall(COLOR_YELLOW);
                         led_colors[0].rgb = COLOR_BLUE.rgb;
                         led_colors[2].rgb = COLOR_BLUE.rgb;
-                        rgb_show();
-                    }
-
-                    vTaskDelay(5000/portTICK_PERIOD_MS);
-
-                    hoja_stop_core();
-
-                    err = hoja_start_core();
-
-                    if (err == HOJA_OK)
-                    {
-                        rgb_setall(COLOR_GREEN);
                         rgb_show();
                     }
 
