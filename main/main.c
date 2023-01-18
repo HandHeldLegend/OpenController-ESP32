@@ -206,11 +206,11 @@ void local_button_cb(hoja_button_data_s *button_data)
     // of a button input getting dropped.
 
     // Y button
-    button_data->button_left    |= !util_getbit(regread_low, GPIO_BTN_Y);
+    button_data->button_left    = !util_getbit(regread_low, GPIO_BTN_Y);
     // Dpad Down
-    button_data->dpad_down      |= !util_getbit(regread_high, GPIO_BTN_DD);
+    button_data->dpad_down      = !util_getbit(regread_high, GPIO_BTN_DD);
     // L trigger
-    button_data->trigger_l      |= !util_getbit(regread_low, GPIO_BTN_L);
+    button_data->trigger_l      = !util_getbit(regread_low, GPIO_BTN_L);
 
     // Release port D Set port C
     GPIO.out_w1ts = (uint32_t) (1ULL<<GPIO_BTN_PULLD);
@@ -223,9 +223,9 @@ void local_button_cb(hoja_button_data_s *button_data)
     regread_high = REG_READ(GPIO_IN1_REG);
 
     // X button
-    button_data->button_up      |= !util_getbit(regread_low, GPIO_BTN_X);
+    button_data->button_up      = !util_getbit(regread_low, GPIO_BTN_X);
     // Dpad Down
-    button_data->dpad_left      |= !util_getbit(regread_high, GPIO_BTN_DL);
+    button_data->dpad_left      = !util_getbit(regread_high, GPIO_BTN_DL);
 
     // Release port C set port B
     GPIO.out_w1ts = (uint32_t) (1ULL<<GPIO_BTN_PULLC);
@@ -237,11 +237,11 @@ void local_button_cb(hoja_button_data_s *button_data)
     regread_high = REG_READ(GPIO_IN1_REG);
 
     // B button
-    button_data->button_down    |= !util_getbit(regread_low, GPIO_BTN_B);
+    button_data->button_down    = !util_getbit(regread_low, GPIO_BTN_B);
     // Dpad Up
-    button_data->dpad_up        |= !util_getbit(regread_high, GPIO_BTN_DU);
+    button_data->dpad_up        = !util_getbit(regread_high, GPIO_BTN_DU);
     // Start button
-    button_data->button_start   |= !util_getbit(regread_low, GPIO_BTN_START);
+    button_data->button_start   = !util_getbit(regread_low, GPIO_BTN_START);
     if (button_data->button_start)
     {
         local_start_pressed = true;
@@ -264,14 +264,14 @@ void local_button_cb(hoja_button_data_s *button_data)
     GPIO.out1_w1ts.val = (uint32_t) (1ULL << 1);
 
     // A button
-    button_data->button_right   |= !util_getbit(regread_low, GPIO_BTN_A);
+    button_data->button_right   = !util_getbit(regread_low, GPIO_BTN_A);
     // Dpad Right
-    button_data->dpad_right     |= !util_getbit(regread_high, GPIO_BTN_DR);
+    button_data->dpad_right     = !util_getbit(regread_high, GPIO_BTN_DR);
     // R trigger
-    button_data->trigger_r      |= !util_getbit(regread_low, GPIO_BTN_R);
+    button_data->trigger_r      = !util_getbit(regread_low, GPIO_BTN_R);
 
     // Read select button (not tied to matrix)
-    button_data->button_select  |= !util_getbit(regread_low, GPIO_BTN_SELECT);
+    button_data->button_select  = !util_getbit(regread_low, GPIO_BTN_SELECT);
 
     // Tie the select button to our sleep button.
     if (button_data->button_select)
@@ -318,9 +318,6 @@ void local_system_evt(hoja_system_event_t evt)
         case HEVT_API_INIT_OK:
             ESP_LOGI(TAG, "HOJA initialized OK callback.");
 
-            // Play boot animation.
-            boot_anim();
-
             local_button_cb(&hoja_button_data);
 
             // Check to see what buttons are being held. Adjust state accordingly.
@@ -357,6 +354,9 @@ void local_system_evt(hoja_system_event_t evt)
                 }
             }
 
+            // Play boot animation.
+            boot_anim();
+            
             // Get boot mode and it will perform a callback.
             err = util_battery_boot_status();
             if (err != HOJA_OK)
@@ -523,8 +523,19 @@ void local_boot_evt(hoja_boot_event_t evt)
                     break;
 
                 case HOJA_CONTROLLER_MODE_XINPUT:
+                    
                     hoja_set_core(HOJA_CORE_USB);
                     core_usb_set_subcore(USB_SUBCORE_XINPUT);
+
+                    err = hoja_start_core();
+
+                    if (err == HOJA_OK)
+                    {
+                        rgb_setall(COLOR_GREEN);
+                        rgb_show();
+                    }
+
+                    hoja_set_core(HOJA_CORE_BT_XINPUT);
 
                     err = hoja_start_core();
 
