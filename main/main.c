@@ -299,7 +299,29 @@ void local_analog_cb(hoja_analog_data_s *analog_data)
     */
 
     analog_data->ls_x = 2048;
+    if (hoja_button_data.dpad_left)
+    {
+        hoja_button_data.dpad_left = 0;
+        analog_data->ls_x -= 1600;
+    }
+    if (hoja_button_data.dpad_right)
+    {
+        hoja_button_data.dpad_right = 0;
+        analog_data->ls_x += 1600;
+    }
+
     analog_data->ls_y = 2048;
+    if (hoja_button_data.dpad_up)
+    {
+        hoja_button_data.dpad_up = 0;
+        analog_data->ls_y += 1600;
+    }
+    if (hoja_button_data.dpad_down)
+    {
+        hoja_button_data.dpad_down = 0;
+        analog_data->ls_y -= 1600;
+    }
+    
     analog_data->rs_x = 2048;
     analog_data->rs_y = 2048;
 
