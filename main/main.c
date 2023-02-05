@@ -64,14 +64,9 @@
 // ADC channel for battery voltage reading
 #define ADC_BATTERY_LVL     ADC1_CHANNEL_0
 
-uint8_t local_bluetooth_mode = HOJA_CORE_NS;
-uint8_t local_retro_mode = false;
-uint8_t local_cable_plugged = false;
-
 // Variables used to store register reads
 uint32_t regread_low = 0;
 uint32_t regread_high = 0;
-bool     local_start_pressed = false;
 
 // Variable to hold current color data
 rgb_s led_colors[CONFIG_NP_RGB_COUNT] = {0};
@@ -191,7 +186,7 @@ void enter_sleep()
 // Set up function to update inputs
 // Used to determine delay period between each scan (microseconds)
 #define US_READ  15
-void local_button_cb(hoja_button_data_s *button_data)
+void local_button_cb()
 {
     // First set port D as low output
     GPIO.out_w1tc = (uint32_t) (1ULL<<GPIO_BTN_PULLD);
@@ -200,17 +195,13 @@ void local_button_cb(hoja_button_data_s *button_data)
     // Read the GPIO registers and mask the data
     regread_low = REG_READ(GPIO_IN_REG) & GPIO_INPUT_PIN_MASK;
     regread_high = REG_READ(GPIO_IN1_REG);
-    
-    // Grab the relevant button data
-    // We OR-EQUALS because we don't want the possibility
-    // of a button input getting dropped.
 
     // Y button
-    button_data->button_left    = !util_getbit(regread_low, GPIO_BTN_Y);
+    hoja_button_data.button_left    = !util_getbit(regread_low, GPIO_BTN_Y);
     // Dpad Down
-    button_data->dpad_down      = !util_getbit(regread_high, GPIO_BTN_DD);
+    hoja_button_data.dpad_down      = !util_getbit(regread_high, GPIO_BTN_DD);
     // L trigger
-    button_data->trigger_l      = !util_getbit(regread_low, GPIO_BTN_L);
+    hoja_button_data.trigger_l      = !util_getbit(regread_low, GPIO_BTN_L);
 
     // Release port D Set port C
     GPIO.out_w1ts = (uint32_t) (1ULL<<GPIO_BTN_PULLD);
@@ -223,9 +214,9 @@ void local_button_cb(hoja_button_data_s *button_data)
     regread_high = REG_READ(GPIO_IN1_REG);
 
     // X button
-    button_data->button_up      = !util_getbit(regread_low, GPIO_BTN_X);
+    hoja_button_data.button_up      = !util_getbit(regread_low, GPIO_BTN_X);
     // Dpad Down
-    button_data->dpad_left      = !util_getbit(regread_high, GPIO_BTN_DL);
+    hoja_button_data.dpad_left      = !util_getbit(regread_high, GPIO_BTN_DL);
 
     // Release port C set port B
     GPIO.out_w1ts = (uint32_t) (1ULL<<GPIO_BTN_PULLC);
@@ -237,19 +228,11 @@ void local_button_cb(hoja_button_data_s *button_data)
     regread_high = REG_READ(GPIO_IN1_REG);
 
     // B button
-    button_data->button_down    = !util_getbit(regread_low, GPIO_BTN_B);
+    hoja_button_data.button_down    = !util_getbit(regread_low, GPIO_BTN_B);
     // Dpad Up
-    button_data->dpad_up        = !util_getbit(regread_high, GPIO_BTN_DU);
+    hoja_button_data.dpad_up        = !util_getbit(regread_high, GPIO_BTN_DU);
     // Start button
-    button_data->button_start   = !util_getbit(regread_low, GPIO_BTN_START);
-    if (button_data->button_start)
-    {
-        local_start_pressed = true;
-    }
-    else
-    {
-        local_start_pressed = false;
-    }
+    hoja_button_data.button_start   = !util_getbit(regread_low, GPIO_BTN_START);
 
     // Release port B set port A
     GPIO.out_w1ts = (uint32_t) (1ULL<<GPIO_BTN_PULLB);
@@ -264,83 +247,104 @@ void local_button_cb(hoja_button_data_s *button_data)
     GPIO.out1_w1ts.val = (uint32_t) (1ULL << 1);
 
     // A button
-    button_data->button_right   = !util_getbit(regread_low, GPIO_BTN_A);
+    hoja_button_data.button_right   = !util_getbit(regread_low, GPIO_BTN_A);
     // Dpad Right
-    button_data->dpad_right     = !util_getbit(regread_high, GPIO_BTN_DR);
+    hoja_button_data.dpad_right     = !util_getbit(regread_high, GPIO_BTN_DR);
     // R trigger
-    button_data->trigger_r      = !util_getbit(regread_low, GPIO_BTN_R);
+    hoja_button_data.trigger_r      = !util_getbit(regread_low, GPIO_BTN_R);
 
     // Read select button (not tied to matrix)
-    button_data->button_select  = !util_getbit(regread_low, GPIO_BTN_SELECT);
+    hoja_button_data.button_select  = !util_getbit(regread_low, GPIO_BTN_SELECT);
 
     // Tie the select button to our sleep button.
-    if (button_data->button_select)
+    if (hoja_button_data.button_select)
     {
-        button_data->button_sleep = 1;
+        hoja_button_data.button_sleep = 1;
     }
     else
     {
-        button_data->button_sleep = 0;
+        hoja_button_data.button_sleep = 0;
+    }
+
+    if (hoja_button_data.button_start)
+    {
+        hoja_button_data.button_pair = 1;
+    }
+    else
+    {
+        hoja_button_data.button_pair = 0;
     }
 }
 
 // Separate task to read sticks.
 // This is essential to have as a separate component as ADC scans typically take more time and this is only
 // scanned once between each polling interval. This varies from core to core.
-void local_analog_cb(hoja_analog_data_s *analog_data)
+void local_analog_cb()
 {
     const char* TAG = "stick_task";
     // read stick 1 and 2
 
     /*
-    analog_data->ls_x = (uint16_t) adc1_get_raw(ADC_STICK_LX);
-    analog_data->rs_x = (uint16_t) adc1_get_raw(ADC_STICK_RX);
-    analog_data->rs_y = (uint16_t) adc1_get_raw(ADC_STICK_RY);
+    hoja_analog_data.ls_x = (uint16_t) adc1_get_raw(ADC_STICK_LX);
+    hoja_analog_data.rs_x = (uint16_t) adc1_get_raw(ADC_STICK_RX);
+    hoja_analog_data.rs_y = (uint16_t) adc1_get_raw(ADC_STICK_RY);
     */
 
-    analog_data->ls_x = 2048;
+    hoja_analog_data.ls_x = 2048;
     if (hoja_button_data.dpad_left)
     {
         hoja_button_data.dpad_left = 0;
-        analog_data->ls_x -= 1600;
+        hoja_analog_data.ls_x -= 1600;
     }
     if (hoja_button_data.dpad_right)
     {
         hoja_button_data.dpad_right = 0;
-        analog_data->ls_x += 1600;
+        hoja_analog_data.ls_x += 1600;
     }
 
-    analog_data->ls_y = 2048;
+    hoja_analog_data.ls_y = 2048;
     if (hoja_button_data.dpad_up)
     {
         hoja_button_data.dpad_up = 0;
-        analog_data->ls_y += 1600;
+        hoja_analog_data.ls_y += 1600;
     }
     if (hoja_button_data.dpad_down)
     {
         hoja_button_data.dpad_down = 0;
-        analog_data->ls_y -= 1600;
+        hoja_analog_data.ls_y -= 1600;
     }
-    
-    analog_data->rs_x = 2048;
-    analog_data->rs_y = 2048;
 
-    analog_data->lt_a = 0;
-    analog_data->rt_a = 0;
+    hoja_analog_data.rs_x = 2048;
+    hoja_analog_data.rs_y = 2048;
+
+    hoja_analog_data.lt_a = 0;
+    hoja_analog_data.rt_a = 0;
 }
 
 // Handle System events
-void local_system_evt(hoja_system_event_t evt)
+void local_system_evt(hoja_system_event_t evt, uint8_t param)
 {
     const char* TAG = "local_system_evt";
     switch(evt)
     {
         esp_err_t err = ESP_OK;
 
+        // Called after API initialize function
         case HEVT_API_INIT_OK:
+        {
             ESP_LOGI(TAG, "HOJA initialized OK callback.");
 
-            local_button_cb(&hoja_button_data);
+            local_button_cb();
+            local_button_cb();
+
+            if (hoja_button_data.button_pair)
+            {
+                hoja_set_force_wired(true);
+            }
+            else
+            {
+                hoja_set_force_wired(false);
+            }
 
             // Check to see what buttons are being held. Adjust state accordingly.
             if (hoja_button_data.button_left)
@@ -386,27 +390,74 @@ void local_system_evt(hoja_system_event_t evt)
                 ESP_LOGE(TAG, "Issue when getting boot battery status.");
             }
 
+        }
+            break;
+        
+        // Called when shutdown triggers from input loop
+        case HEVT_API_SHUTDOWN:
+        {
+            enter_sleep();
+        }
+            break;
+        
+        // Called when reboot is requested
+        case HEVT_API_REBOOT:
+        {
+            enter_reboot();
+        }
             break;
 
-        case HEVT_API_SHUTDOWN:
-            if (!local_cable_plugged)
-            {
-                enter_sleep();
-            }
-            else
-            {
-                enter_reboot();
-            }
+        case HEVT_API_PLAYERNUM:
+            // TO DO
+        {
+
+        }
             break;
-        case HEVT_API_REBOOT:
-            enter_reboot();
+
+        case HEVT_API_RUMBLE:
+            // TO DO
+        {
+
+        }
             break;
+
     }
 }
 
 void local_bt_evt(hoja_bt_event_t evt)
 {
+    const char* TAG = "local_bt_evt";
 
+    switch (evt)
+    {
+        default:
+            ESP_LOGI(TAG, "Unknown bt event");
+            break;
+
+        case HEVT_BT_STARTED:
+            ESP_LOGI(TAG, "BT Started OK.");
+            break;
+
+        case HEVT_BT_CONNECTING:
+            ESP_LOGI(TAG, "Connecting BT...");
+            break;
+
+        case HEVT_BT_PAIRING:
+            ESP_LOGI(TAG, "Pairing BT Device.");
+            break;
+
+        case HEVT_BT_CONNECTED:
+            ESP_LOGI(TAG, "BT Device Connected.");
+            rgb_setall(COLOR_WHITE);
+            rgb_show();
+            break;
+
+        case HEVT_BT_DISCONNECTED:
+            ESP_LOGI(TAG, "BT Device Disconnected.");
+            rgb_setall(COLOR_RED);
+            rgb_show();
+            break;
+    }
 }
 
 void local_usb_evt(hoja_usb_event_t evt)
@@ -414,16 +465,7 @@ void local_usb_evt(hoja_usb_event_t evt)
 
 }
 
-void local_gc_evt(hoja_gc_event_t evt, uint8_t param)
-{
-
-}
-
-void local_ns_evt(hoja_ns_event_t evt, uint8_t param)
-{
-
-}
-
+// Events from the wired utility
 void local_wired_evt(hoja_wired_event_t evt)
 {
     const char* TAG = "local_wired_evt";
@@ -503,11 +545,14 @@ void local_boot_evt(hoja_boot_event_t evt)
 {
     esp_err_t err;
     const char* TAG = "local_boot_evt";
+
     switch(evt)
     {
+        // With no battery connected
         case HEVT_BOOT_NOBATTERY:
             ESP_LOGI(TAG, "No battery detected.");
         case HEVT_BOOT_PLUGGED:
+        {
             if (evt == HEVT_BOOT_PLUGGED)
             {
                 ESP_LOGI(TAG, "Plugged in.");
@@ -516,6 +561,9 @@ void local_boot_evt(hoja_boot_event_t evt)
             switch(loaded_settings.controller_mode)
             {
                 case HOJA_CONTROLLER_MODE_RETRO:
+                {
+                    util_battery_set_charge_rate(35);
+
                     err = util_wired_detect_loop();
                     if (!err)
                     {
@@ -526,11 +574,13 @@ void local_boot_evt(hoja_boot_event_t evt)
                     else
                     {
                         ESP_LOGE(TAG, "Failed to start wired retro loop.");
-                    }
+                    }   
+                }
                     break;
-                
+
                 default:
                 case HOJA_CONTROLLER_MODE_DINPUT:
+                {
                     hoja_set_core(HOJA_CORE_USB);
                     core_usb_set_subcore(USB_SUBCORE_DINPUT);
 
@@ -538,14 +588,22 @@ void local_boot_evt(hoja_boot_event_t evt)
 
                     if (err == HOJA_OK)
                     {
-                        rgb_setall(COLOR_BLUE);
+                        rgb_setall(COLOR_CYAN);
+                        led_colors[0].rgb = COLOR_BLUE.rgb;
+                        led_colors[2].rgb = COLOR_BLUE.rgb;
+                        rgb_show();
+                        util_battery_set_charge_rate(100);
+                    }
+                    else
+                    {
+                        rgb_setall(COLOR_RED);
                         rgb_show();
                     }
-
+                }
                     break;
 
                 case HOJA_CONTROLLER_MODE_XINPUT:
-                    
+                {
                     hoja_set_core(HOJA_CORE_USB);
                     core_usb_set_subcore(USB_SUBCORE_XINPUT);
 
@@ -555,22 +613,13 @@ void local_boot_evt(hoja_boot_event_t evt)
                     {
                         rgb_setall(COLOR_GREEN);
                         rgb_show();
+                        util_battery_set_charge_rate(100);
                     }
-
-                    hoja_set_core(HOJA_CORE_BT_XINPUT);
-
-                    err = hoja_start_core();
-
-                    if (err == HOJA_OK)
-                    {
-                        rgb_setall(COLOR_GREEN);
-                        rgb_show();
-                    }
-
+                }
                     break;
                 
                 case HOJA_CONTROLLER_MODE_NS:
-
+                {
                     hoja_set_core(HOJA_CORE_USB);
                     core_usb_set_subcore(USB_SUBCORE_NS);
 
@@ -582,16 +631,131 @@ void local_boot_evt(hoja_boot_event_t evt)
                         led_colors[0].rgb = COLOR_BLUE.rgb;
                         led_colors[2].rgb = COLOR_BLUE.rgb;
                         rgb_show();
+                        util_battery_set_charge_rate(100);
                     }
+                    else
+                    {
+                        rgb_setall(COLOR_RED);
+                        rgb_show();
+                    }
+                }
+                    break;
+            }
+        }
+            break;
 
+        // This case is reached if
+        // the controller is unplugged but has a battery
+        case HEVT_BOOT_UNPLUGGED:
+        {
+            ESP_LOGI(TAG, "Unplugged.");
+
+            if (hoja_get_force_wired())
+            {
+                // Boot as if we are wired if USB standby is enabled.
+                hoja_event_cb(HOJA_EVT_BOOT, HEVT_BOOT_PLUGGED, 0x00);
+                return;
+            }
+
+            switch(loaded_settings.controller_mode)
+            {
+                case HOJA_CONTROLLER_MODE_RETRO:
+                {
+                    util_battery_set_charge_rate(35);
+
+                    err = util_wired_detect_loop();
+                    if (!err)
+                    {
+                        ESP_LOGI(TAG, "Started wired retro loop OK.");
+                        rgb_setall(COLOR_ORANGE);
+                        rgb_show();
+                    }
+                    else
+                    {
+                        ESP_LOGE(TAG, "Failed to start wired retro loop.");
+                        rgb_setall(COLOR_RED);
+                        rgb_show();
+                    }
+                    
+                }
+                    break;
+
+                default:
+                case HOJA_CONTROLLER_MODE_DINPUT:
+                {
+                    err = hoja_set_core(HOJA_CORE_BT_DINPUT);
+
+                    err = hoja_start_core();
+
+                    if (err == HOJA_OK)
+                    {
+                        ESP_LOGI(TAG, "Started BT Dinput OK.");
+                        rgb_setall(COLOR_BLUE);
+                        rgb_show();
+                        util_battery_set_charge_rate(100);
+                    }
+                    else
+                    {
+                        ESP_LOGE(TAG, "Failed to start Dinput BT.");
+                        rgb_setall(COLOR_RED);
+                        rgb_show();
+                    }
+                }
+                    break;
+
+                case HOJA_CONTROLLER_MODE_NS:
+                {
+                    core_ns_set_subcore(NS_TYPE_SNES);
+                    err = hoja_set_core(HOJA_CORE_NS);
+
+                    err = hoja_start_core();
+
+                    if (err == HOJA_OK)
+                    {
+                        ESP_LOGI(TAG, "Started BT Switch OK.");
+                        rgb_setall(COLOR_YELLOW);
+                        rgb_show();
+                        util_battery_set_charge_rate(100);
+                    }
+                    else
+                    {
+                        ESP_LOGE(TAG, "Failed to start Switch BT.");
+                        rgb_setall(COLOR_RED);
+                        rgb_show();
+                    }
+                }
+                    break;
+
+                case HOJA_CONTROLLER_MODE_XINPUT:
+                {
+                    err = hoja_set_core(HOJA_CORE_BT_XINPUT);
+
+                    err = hoja_start_core();
+
+                    if (err == HOJA_OK)
+                    {
+                        ESP_LOGI(TAG, "Started BT XInput OK.");
+                        rgb_setall(COLOR_GREEN);
+                        rgb_show();
+                        util_battery_set_charge_rate(100);
+                    }
+                    else
+                    {
+                        ESP_LOGE(TAG, "Failed to start XInput BT.");
+                        rgb_setall(COLOR_RED);
+                        rgb_show();
+                    }
+                }
                     break;
             }
 
-            break;
-
-        case HEVT_BOOT_UNPLUGGED:
-            ESP_LOGI(TAG, "Unplugged.");
-            enter_sleep();
+            if (err == HOJA_OK)
+            {
+                // Start battery monitor utility
+                util_battery_start_monitor();
+            }
+            
+        }
             break;
     }
 }
@@ -599,10 +763,12 @@ void local_boot_evt(hoja_boot_event_t evt)
 // Callback to handle HOJA events
 void local_event_cb(hoja_event_type_t type, uint8_t evt, uint8_t param)
 {   
+    const char* TAG = "local_event_cb";
+
     switch(type)
     {
         default:
-            ESP_LOGI("local_event_cb", "Unrecognized event occurred: %X", (unsigned int) type);
+            ESP_LOGI(TAG, "Unrecognized event occurred: %X", (unsigned int) type);
             break;
 
         case HOJA_EVT_BOOT:
@@ -610,7 +776,7 @@ void local_event_cb(hoja_event_type_t type, uint8_t evt, uint8_t param)
             break;
 
         case HOJA_EVT_SYSTEM:
-            local_system_evt(evt);
+            local_system_evt(evt, param);
             break;
 
         case HOJA_EVT_CHARGER:
@@ -623,14 +789,6 @@ void local_event_cb(hoja_event_type_t type, uint8_t evt, uint8_t param)
 
         case HOJA_EVT_BATTERY:
             local_battery_evt(evt, param);
-            break;
-
-        case HOJA_EVT_GC:
-            local_gc_evt(evt, param);
-            break;
-
-        case HOJA_EVT_NS:
-            local_ns_evt(evt, param);
             break;
 
         case HOJA_EVT_USB:
@@ -670,6 +828,7 @@ void app_main()
 
     util_i2c_initialize();
     util_battery_set_type(BATTYPE_BQ25180);
+    util_battery_set_charge_rate(35);
     neopixel_init(led_colors, VSPI_HOST);
     rgb_setbrightness(25);
 
