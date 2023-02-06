@@ -146,27 +146,6 @@ void boot_anim()
     rgb_show();
 }
 
-// Removed for now
-/*
-void read_battery_voltage(void * parameters)
-{
-    // Set up ADC
-    ESP_ERROR_CHECK(adc1_config_width(ADC_WIDTH_BIT_DEFAULT));
-    ESP_ERROR_CHECK(adc1_config_channel_atten(ADC_BATTERY_LVL, ADC_ATTEN_DB_11));
-
-    for(;;)
-    {
-        // Read ADC and convert to voltage values
-        int out = 0;
-        out = adc1_get_raw(ADC_BATTERY_LVL);
-        float raw = (float) out;
-        float voltage = ((raw * 3.3) / 1950);
-        ESP_LOGI("BAT LVL:", "%f", voltage);
-        vTaskDelay(1000/portTICK_PERIOD_MS);
-    }
-}
-*/
-
 // Reboot system properly.
 void enter_reboot()
 {
@@ -345,6 +324,9 @@ void local_system_evt(hoja_system_event_t evt, uint8_t param)
             {
                 hoja_set_force_wired(false);
             }
+
+            //DEBUG
+            hoja_set_force_wired(true);
 
             // Check to see what buttons are being held. Adjust state accordingly.
             if (hoja_button_data.button_left)
