@@ -270,28 +270,7 @@ void local_analog_cb()
     */
 
     hoja_analog_data.ls_x = 2048;
-    if (hoja_button_data.dpad_left)
-    {
-        hoja_button_data.dpad_left = 0;
-        hoja_analog_data.ls_x -= 1600;
-    }
-    if (hoja_button_data.dpad_right)
-    {
-        hoja_button_data.dpad_right = 0;
-        hoja_analog_data.ls_x += 1600;
-    }
-
     hoja_analog_data.ls_y = 2048;
-    if (hoja_button_data.dpad_up)
-    {
-        hoja_button_data.dpad_up = 0;
-        hoja_analog_data.ls_y += 1600;
-    }
-    if (hoja_button_data.dpad_down)
-    {
-        hoja_button_data.dpad_down = 0;
-        hoja_analog_data.ls_y -= 1600;
-    }
 
     hoja_analog_data.rs_x = 2048;
     hoja_analog_data.rs_y = 2048;
@@ -324,9 +303,6 @@ void local_system_evt(hoja_system_event_t evt, uint8_t param)
             {
                 hoja_set_force_wired(false);
             }
-
-            //DEBUG
-            hoja_set_force_wired(true);
 
             // Check to see what buttons are being held. Adjust state accordingly.
             if (hoja_button_data.button_left)
