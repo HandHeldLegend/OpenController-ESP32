@@ -68,87 +68,11 @@
 uint32_t regread_low = 0;
 uint32_t regread_high = 0;
 
-// Variable to hold current color data
-rgb_s led_colors[CONFIG_NP_RGB_COUNT] = {0};
-
-// LED boot animation
-void boot_anim()
-{
-    int back_forth = 0;
-    bool toggle = false;
-    bool colorflip = false;
-    uint8_t color_idx = 0;
-    uint8_t color_last_idx = 0;
-    rgb_s colors[6] = {COLOR_RED, COLOR_ORANGE, COLOR_YELLOW, COLOR_GREEN, COLOR_BLUE, COLOR_PURPLE};
-    for(int i = 0; i < 12; i++)
-    {
-        memset(led_colors, 0x00, sizeof(led_colors));
-        led_colors[back_forth] = colors[color_idx];
-        
-        if (!toggle)
-        {
-            if (back_forth > 0)
-            {
-                led_colors[back_forth-1] = colors[color_last_idx];
-                color_last_idx = color_idx;
-            }
-            back_forth += 1;
-            if (back_forth == CONFIG_NP_RGB_COUNT)
-            {
-                toggle = true;
-                back_forth = CONFIG_NP_RGB_COUNT-1;
-            }
-        }
-        else
-        {
-            if (back_forth < CONFIG_NP_RGB_COUNT-1)
-            {
-                led_colors[back_forth+1] = colors[color_last_idx];
-                color_last_idx = color_idx;
-            }
-            back_forth -= 1;
-            if (back_forth == -1)
-            {
-                toggle = false;
-                back_forth = 0;
-            }
-        }
-
-        if (!colorflip)
-        {
-            if (color_idx + 1 > 5)
-            {
-                colorflip = true;
-                color_idx = 5;
-            }
-            else
-            {
-                color_idx += 1;
-            }
-        }
-        else
-        {
-            if (color_idx - 1 < 0)
-            {
-                colorflip = false;
-                color_idx = 0;
-            }
-            else
-            {
-                color_idx -= 1;
-            }
-        }
-
-        rgb_show();
-        vTaskDelay(100/portTICK_PERIOD_MS);
-    }
-    rgb_setall(COLOR_BLACK);
-    rgb_show();
-}
-
 // Reboot system properly.
 void enter_reboot()
 {
+    led_animator_send(LEDANIM_FADETO, COLOR_BLACK);
+    vTaskDelay(250/portTICK_PERIOD_MS);
     util_battery_set_charge_rate(35);
     esp_restart();
 }
@@ -156,9 +80,8 @@ void enter_reboot()
 // Sleep mode should check the charge level every 30 seconds or so. 
 void enter_sleep()
 {
-    rgb_setall(COLOR_BLACK);
-    rgb_show();
-
+    led_animator_send(LEDANIM_FADETO, COLOR_BLACK);
+    vTaskDelay(250/portTICK_PERIOD_MS);
     util_battery_enable_ship_mode();
 }
 
@@ -235,23 +158,53 @@ void local_button_cb()
     // Read select button (not tied to matrix)
     hoja_button_data.button_select  = !util_getbit(regread_low, GPIO_BTN_SELECT);
 
+    // Reset macros
+    hoja_button_data.button_capture = 0;
+    hoja_button_data.button_home    = 0;
+    hoja_button_data.button_pair    = 0;
+    hoja_button_data.button_sleep   = 0;
+    hoja_button_data.trigger_zl     = 0;
+    hoja_button_data.trigger_zr     = 0;
+
+
     // Tie the select button to our sleep button.
     if (hoja_button_data.button_select)
     {
         hoja_button_data.button_sleep = 1;
     }
-    else
-    {
-        hoja_button_data.button_sleep = 0;
-    }
 
+    // Tie the start button to our sleep button
     if (hoja_button_data.button_start)
     {
         hoja_button_data.button_pair = 1;
     }
-    else
+
+    if (hoja_button_data.button_start && hoja_button_data.trigger_l)
     {
-        hoja_button_data.button_pair = 0;
+        hoja_button_data.trigger_l = 0;
+        hoja_button_data.button_start = 0;
+        hoja_button_data.button_capture = 1;
+    }
+
+    if (hoja_button_data.button_start && hoja_button_data.trigger_r)
+    {
+        hoja_button_data.trigger_r = 0;
+        hoja_button_data.button_start = 0;
+        hoja_button_data.button_home = 1;
+    }
+
+    if (hoja_button_data.button_select && hoja_button_data.trigger_l)
+    {
+        hoja_button_data.trigger_l = 0;
+        hoja_button_data.button_select = 0;
+        hoja_button_data.trigger_zl = 1;
+    }
+
+    if (hoja_button_data.button_select && hoja_button_data.trigger_r)
+    {
+        hoja_button_data.trigger_r = 0;
+        hoja_button_data.button_select = 0;
+        hoja_button_data.trigger_zr = 1;
     }
 }
 
@@ -337,9 +290,6 @@ void local_system_evt(hoja_system_event_t evt, uint8_t param)
                     hoja_settings_saveall();
                 }
             }
-
-            // Play boot animation.
-            boot_anim();
             
             // Get boot mode and it will perform a callback.
             err = util_battery_boot_status();
@@ -368,6 +318,26 @@ void local_system_evt(hoja_system_event_t evt, uint8_t param)
         case HEVT_API_PLAYERNUM:
             // TO DO
         {
+            if (param == 1)
+            {
+                led_animator_send(LEDANIM_FADETO, COLOR_RED);
+            }
+            else if (param == 2)
+            {
+                led_animator_send(LEDANIM_FADETO, COLOR_BLUE);
+            }
+            else if (param == 3)
+            {
+                led_animator_send(LEDANIM_FADETO, COLOR_GREEN);
+            }
+            else if (param == 4)
+            {
+                led_animator_send(LEDANIM_FADETO, COLOR_PURPLE);
+            }
+            else
+            {
+                led_animator_send(LEDANIM_FADETO, COLOR_ORANGE);
+            }
 
         }
             break;
@@ -406,14 +376,12 @@ void local_bt_evt(hoja_bt_event_t evt)
 
         case HEVT_BT_CONNECTED:
             ESP_LOGI(TAG, "BT Device Connected.");
-            rgb_setall(COLOR_WHITE);
-            rgb_show();
+            led_animator_send(LEDANIM_FADETO, mode_color);
             break;
 
         case HEVT_BT_DISCONNECTED:
             ESP_LOGI(TAG, "BT Device Disconnected.");
-            rgb_setall(COLOR_RED);
-            rgb_show();
+            
             break;
     }
 }
@@ -438,14 +406,14 @@ void local_wired_evt(hoja_wired_event_t evt)
         
         case HEVT_WIRED_SNES_DETECT:
             hoja_set_core(HOJA_CORE_SNES);
-            rgb_setall(COLOR_PURPLE);
+            led_animator_send(LEDANIM_FADETO, COLOR_WHITE);
             err = hoja_start_core();
 
             break;
 
         case HEVT_WIRED_JOYBUS_DETECT:
             hoja_set_core(HOJA_CORE_GC);
-            rgb_setall(COLOR_PINK);
+            led_animator_send(LEDANIM_FADETO, COLOR_PURPLE);
             err = hoja_start_core();
 
             break;
@@ -526,8 +494,7 @@ void local_boot_evt(hoja_boot_event_t evt)
                     if (!err)
                     {
                         ESP_LOGI(TAG, "Started wired retro loop OK.");
-                        rgb_setall(COLOR_ORANGE);
-                        rgb_show();
+                        led_animator_send(LEDANIM_BLINK, COLOR_ORANGE);
                     }
                     else
                     {
@@ -539,63 +506,66 @@ void local_boot_evt(hoja_boot_event_t evt)
                 default:
                 case HOJA_CONTROLLER_MODE_DINPUT:
                 {
+                    util_battery_set_charge_rate(100);
                     hoja_set_core(HOJA_CORE_USB);
                     core_usb_set_subcore(USB_SUBCORE_DINPUT);
+
+                    mode_color.rgb = COLOR_BLUE.rgb;
+                    led_animator_send(LEDANIM_FADETO, mode_color);
 
                     err = hoja_start_core();
 
                     if (err == HOJA_OK)
                     {
-                        rgb_setall(COLOR_CYAN);
-                        led_colors[0].rgb = COLOR_BLUE.rgb;
-                        led_colors[2].rgb = COLOR_BLUE.rgb;
-                        rgb_show();
-                        util_battery_set_charge_rate(100);
+
                     }
                     else
                     {
-                        rgb_setall(COLOR_RED);
-                        rgb_show();
+
                     }
                 }
                     break;
 
                 case HOJA_CONTROLLER_MODE_XINPUT:
                 {
+                    util_battery_set_charge_rate(100);
+
                     hoja_set_core(HOJA_CORE_USB);
                     core_usb_set_subcore(USB_SUBCORE_XINPUT);
+
+                    mode_color.rgb = COLOR_GREEN.rgb;
+                    led_animator_send(LEDANIM_FADETO, mode_color);
 
                     err = hoja_start_core();
 
                     if (err == HOJA_OK)
                     {
-                        rgb_setall(COLOR_GREEN);
-                        rgb_show();
-                        util_battery_set_charge_rate(100);
+
                     }
                 }
                     break;
                 
                 case HOJA_CONTROLLER_MODE_NS:
                 {
+                    util_battery_set_charge_rate(100);
+
                     hoja_set_core(HOJA_CORE_USB);
                     core_usb_set_subcore(USB_SUBCORE_NS);
+
+                    mode_color.rgb = COLOR_YELLOW.rgb;
+                    led_animator_send(LEDANIM_FADETO, mode_color);
 
                     err = hoja_start_core();
 
                     if (err == HOJA_OK)
                     {
-                        rgb_setall(COLOR_YELLOW);
-                        led_colors[0].rgb = COLOR_BLUE.rgb;
-                        led_colors[2].rgb = COLOR_BLUE.rgb;
-                        rgb_show();
-                        util_battery_set_charge_rate(100);
+
                     }
                     else
                     {
-                        rgb_setall(COLOR_RED);
-                        rgb_show();
+
                     }
+
                 }
                     break;
             }
@@ -641,67 +611,64 @@ void local_boot_evt(hoja_boot_event_t evt)
                 default:
                 case HOJA_CONTROLLER_MODE_DINPUT:
                 {
+                    util_battery_set_charge_rate(100);
                     err = hoja_set_core(HOJA_CORE_BT_DINPUT);
+
+                    mode_color.rgb = COLOR_BLUE.rgb;
+                    led_animator_send(LEDANIM_BLINK, mode_color);
 
                     err = hoja_start_core();
 
                     if (err == HOJA_OK)
                     {
-                        ESP_LOGI(TAG, "Started BT Dinput OK.");
-                        rgb_setall(COLOR_BLUE);
-                        rgb_show();
-                        util_battery_set_charge_rate(100);
+                        ESP_LOGI(TAG, "Started BT Dinput OK.");      
                     }
                     else
                     {
                         ESP_LOGE(TAG, "Failed to start Dinput BT.");
-                        rgb_setall(COLOR_RED);
-                        rgb_show();
                     }
                 }
                     break;
 
                 case HOJA_CONTROLLER_MODE_NS:
                 {
+                    util_battery_set_charge_rate(100);
                     core_ns_set_subcore(NS_TYPE_SNES);
                     err = hoja_set_core(HOJA_CORE_NS);
+
+                    mode_color.rgb = COLOR_YELLOW.rgb;
+                    led_animator_send(LEDANIM_BLINK, mode_color);
 
                     err = hoja_start_core();
 
                     if (err == HOJA_OK)
                     {
                         ESP_LOGI(TAG, "Started BT Switch OK.");
-                        rgb_setall(COLOR_YELLOW);
-                        rgb_show();
-                        util_battery_set_charge_rate(100);
                     }
                     else
                     {
                         ESP_LOGE(TAG, "Failed to start Switch BT.");
-                        rgb_setall(COLOR_RED);
-                        rgb_show();
                     }
                 }
                     break;
 
                 case HOJA_CONTROLLER_MODE_XINPUT:
                 {
+                    util_battery_set_charge_rate(100);
                     err = hoja_set_core(HOJA_CORE_BT_XINPUT);
+
+                    mode_color.rgb = COLOR_GREEN.rgb;
+                    led_animator_send(LEDANIM_BLINK, mode_color);
 
                     err = hoja_start_core();
 
                     if (err == HOJA_OK)
                     {
                         ESP_LOGI(TAG, "Started BT XInput OK.");
-                        rgb_setall(COLOR_GREEN);
-                        rgb_show();
-                        util_battery_set_charge_rate(100);
                     }
                     else
                     {
                         ESP_LOGE(TAG, "Failed to start XInput BT.");
-                        rgb_setall(COLOR_RED);
-                        rgb_show();
                     }
                 }
                     break;
@@ -787,8 +754,8 @@ void app_main()
     util_i2c_initialize();
     util_battery_set_type(BATTYPE_BQ25180);
     util_battery_set_charge_rate(35);
-    neopixel_init(led_colors, VSPI_HOST);
-    rgb_setbrightness(25);
+
+    led_animator_init();
 
     hoja_register_button_callback(local_button_cb);
     hoja_register_analog_callback(local_analog_cb);
