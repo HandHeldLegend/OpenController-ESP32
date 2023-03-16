@@ -304,6 +304,7 @@ void local_system_evt(hoja_system_event_t evt, uint8_t param)
         // Called when shutdown triggers from input loop
         case HEVT_API_SHUTDOWN:
         {
+            ESP_LOGI(TAG, "HEV_API_SHUTDOWN");
             enter_sleep();
         }
             break;
@@ -349,6 +350,10 @@ void local_system_evt(hoja_system_event_t evt, uint8_t param)
         }
             break;
 
+        default:
+            ESP_LOGI(TAG, "Unknowne event type: %d", evt);
+            break;
+
     }
 }
 
@@ -388,7 +393,17 @@ void local_bt_evt(hoja_bt_event_t evt)
 
 void local_usb_evt(hoja_usb_event_t evt)
 {
+    switch (evt)
+    {
+        default:
+        case HEVT_USB_DISCONNECTED:
+            led_animator_send(LEDANIM_FADETO, mode_color);
+            break;
 
+        case HEVT_USB_CONNECTED:
+            led_animator_send(LEDANIM_FADETO, COLOR_WHITE);
+            break;
+    }
 }
 
 // Events from the wired utility
@@ -481,7 +496,7 @@ void local_boot_evt(hoja_boot_event_t evt)
         {
             if (evt == HEVT_BOOT_PLUGGED)
             {
-                ESP_LOGI(TAG, "Plugged in.");
+                ESP_LOGI(TAG, "Plugged in on boot.");
             }
 
             switch(loaded_settings.controller_mode)
@@ -595,15 +610,12 @@ void local_boot_evt(hoja_boot_event_t evt)
                     if (!err)
                     {
                         ESP_LOGI(TAG, "Started wired retro loop OK.");
-                        rgb_setall(COLOR_ORANGE);
-                        rgb_show();
+                        led_animator_send(LEDANIM_BLINK, COLOR_ORANGE);
                     }
                     else
                     {
                         ESP_LOGE(TAG, "Failed to start wired retro loop.");
-                        rgb_setall(COLOR_RED);
-                        rgb_show();
-                    }
+                    }   
                     
                 }
                     break;
