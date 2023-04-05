@@ -7,6 +7,7 @@
 
 extern rgb_s led_colors[CONFIG_NP_RGB_COUNT];
 extern rgb_s mode_color;
+extern rgb_s charge_color;
 
 typedef enum
 {
@@ -16,6 +17,8 @@ typedef enum
     LEDANIM_FADETO,
     // Blink from previous color to new color and back
     LEDANIM_BLINK,
+    // Battery breathing fader
+    LEDANIM_BATTERY_BREATHE,
 } led_anim_t;
 
 typedef enum

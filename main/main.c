@@ -47,12 +47,6 @@
 #define GPIO_BTN_STICKR     GPIO_NUM_21
 #define GPIO_BTN_SYNC       GPIO_NUM_16
 
-// ADC channels for analog stick input
-#define ADC_STICK_LX        ADC1_CHANNEL_0
-#define ADC_STICK_LY        ADC1_CHANNEL_3
-#define ADC_STICK_RX        ADC1_CHANNEL_6
-#define ADC_STICK_RY        ADC1_CHANNEL_7
-
 // Input pin mask creation for keypad scanning setup
 #define GPIO_INPUT_PIN_MASK     ( (1ULL<<GPIO_BTN_SCANA) | (1ULL<<GPIO_BTN_SCANB) | (1ULL<<GPIO_BTN_SCANC) | (1ULL<<GPIO_BTN_SCAND) | (1ULL<<GPIO_BTN_SELECT) )
 #define GPIO_INPUT_PORT_MASK    ( (1ULL<< GPIO_BTN_PULLA) | (1ULL<<GPIO_BTN_PULLB) | (1ULL<<GPIO_BTN_PULLC) | (1ULL<<GPIO_BTN_PULLD) )
@@ -83,6 +77,39 @@ void enter_sleep()
     led_animator_send(LEDANIM_FADETO, COLOR_BLACK);
     vTaskDelay(250/portTICK_PERIOD_MS);
     util_battery_enable_ship_mode();
+}
+
+TaskHandle_t local_battery_TaskHandle = NULL;
+// Bool to store whether we should do LED charging update
+bool charge_display = false;
+
+#define VOLTAGE_MAX_READ 2315
+#define VOLTAGE_MIN_READ VOLTAGE_MAX_READ-255
+void local_get_battery_task(void * params)
+{
+    const char* TAG = "local_get_battery_task";
+    ESP_LOGI(TAG, "Starting local battery get task...");
+    for(;;)
+    {
+        int lvl = adc1_get_raw(ADC_BATTERY_LVL);
+        lvl = lvl - VOLTAGE_MIN_READ;
+        
+        if (lvl > 255)
+        {
+            lvl = 255;
+        }
+        else if (lvl < 0)
+        {
+            lvl = 0;
+        }
+        uint8_t out_lvl = 255-lvl;
+
+        ESP_LOGI(TAG, "%d", (unsigned int) out_lvl);
+
+        hoja_set_battery_lvl(out_lvl);
+
+        vTaskDelay(1500/portTICK_PERIOD_MS);
+    }
 }
 
 // Set up function to update inputs
@@ -351,7 +378,7 @@ void local_system_evt(hoja_system_event_t evt, uint8_t param)
             break;
 
         default:
-            ESP_LOGI(TAG, "Unknowne event type: %d", evt);
+            ESP_LOGI(TAG, "Unknown event type: %d", evt);
             break;
 
     }
@@ -397,11 +424,20 @@ void local_usb_evt(hoja_usb_event_t evt)
     {
         default:
         case HEVT_USB_DISCONNECTED:
-            led_animator_send(LEDANIM_FADETO, mode_color);
+            if (util_battery_external_power())
+            {
+                charge_display = true;
+                led_animator_send(LEDANIM_BATTERY_BREATHE, charge_color);
+            }
+            else
+            {
+                enter_sleep();
+            }
             break;
 
         case HEVT_USB_CONNECTED:
-            led_animator_send(LEDANIM_FADETO, COLOR_WHITE);
+            charge_display = false;
+            led_animator_send(LEDANIM_FADETO, mode_color);
             break;
     }
 }
@@ -454,12 +490,30 @@ void local_battery_evt(hoja_battery_event_t evt, uint8_t param)
     switch(evt)
     {
         case HEVT_BATTERY_CHARGING:
+            ESP_LOGI(TAG, "Battery is charging.");
+            charge_color.rgb = COLOR_GREEN.rgb;
+            if(charge_display)
+            {
+                led_animator_send(LEDANIM_BATTERY_BREATHE, charge_color);
+            }
             break;
 
         case HEVT_BATTERY_CHARGECOMPLETE:
+            ESP_LOGI(TAG, "Battery charging completed.");
+            charge_color.rgb = COLOR_BLUE.rgb;
+            if(charge_display)
+            {
+                led_animator_send(LEDANIM_BATTERY_BREATHE, charge_color);
+            }
             break;
 
         case HEVT_BATTERY_NOCHARGE:
+            ESP_LOGI(TAG, "Battery not charging.");
+            charge_color.rgb = COLOR_RED.rgb;
+            if(charge_display)
+            {
+                led_animator_send(LEDANIM_BATTERY_BREATHE, charge_color);
+            }
             break;
 
         default:
@@ -476,8 +530,16 @@ void local_charger_evt(hoja_charger_event_t evt)
     switch(evt)
     {
         case HEVT_CHARGER_PLUGGED:
+            ESP_LOGI(TAG, "Charger plugged in.");
+            hoja_set_external_power(true);
+            if(charge_display)
+            {
+                led_animator_send(LEDANIM_BATTERY_BREATHE, charge_color);
+            }
             break;
         case HEVT_CHARGER_UNPLUGGED:
+            ESP_LOGI(TAG, "Charger unplugged.");
+            enter_sleep();
             break;
     }
 }
@@ -494,15 +556,14 @@ void local_boot_evt(hoja_boot_event_t evt)
             ESP_LOGI(TAG, "No battery detected.");
         case HEVT_BOOT_PLUGGED:
         {
-            if (evt == HEVT_BOOT_PLUGGED)
-            {
-                ESP_LOGI(TAG, "Plugged in on boot.");
-            }
+            ESP_LOGI(TAG, "Plugged in on boot.");
+            charge_display = true;
 
             switch(loaded_settings.controller_mode)
             {
                 case HOJA_CONTROLLER_MODE_RETRO:
                 {
+                    charge_display = false;
                     util_battery_set_charge_rate(35);
 
                     err = util_wired_detect_loop();
@@ -584,6 +645,31 @@ void local_boot_evt(hoja_boot_event_t evt)
                 }
                     break;
             }
+
+            // Start battery monitor utility
+            util_battery_start_monitor();
+
+            vTaskDelay(200/portTICK_PERIOD_MS);
+            if(charge_display)
+            {
+                util_battery_status_t stat = util_get_battery_charging_status();
+                if ((stat == BATSTATUS_UNDEFINED) || (stat == BATSTATUS_NOTCHARGING))
+                {
+                    charge_color.rgb = COLOR_RED.rgb;
+                    led_animator_send(LEDANIM_BATTERY_BREATHE, charge_color);
+                }
+                else if ((stat == BATSTATUS_TRICKLEFAST) || (stat == BATSTATUS_CONSTANT))
+                {
+                    charge_color.rgb = COLOR_GREEN.rgb;
+                    led_animator_send(LEDANIM_BATTERY_BREATHE, charge_color);
+                }
+                else if(stat == BATSTATUS_COMPLETED)
+                {
+                    charge_color.rgb = COLOR_BLUE.rgb;
+                    led_animator_send(LEDANIM_BATTERY_BREATHE, charge_color);
+                }
+            }
+            
         }
             break;
 
@@ -592,6 +678,8 @@ void local_boot_evt(hoja_boot_event_t evt)
         case HEVT_BOOT_UNPLUGGED:
         {
             ESP_LOGI(TAG, "Unplugged.");
+            // Do not show charger display changes.
+            charge_display = false;
 
             if (hoja_get_force_wired())
             {
@@ -685,12 +773,6 @@ void local_boot_evt(hoja_boot_event_t evt)
                 }
                     break;
             }
-
-            if (err == HOJA_OK)
-            {
-                // Start battery monitor utility
-                util_battery_start_monitor();
-            }
             
         }
             break;
@@ -763,6 +845,10 @@ void app_main()
     GPIO.out_w1ts = GPIO_INPUT_CLEAR0_MASK;
     GPIO.out1_w1ts.val = (uint32_t) 0x3;
 
+    // Set up ADC
+    ESP_ERROR_CHECK(adc1_config_width(ADC_WIDTH_BIT_DEFAULT));
+    ESP_ERROR_CHECK(adc1_config_channel_atten(ADC_BATTERY_LVL, ADC_ATTEN_DB_11));
+
     util_i2c_initialize();
     util_battery_set_type(BATTYPE_BQ25180);
     util_battery_set_charge_rate(35);
@@ -772,6 +858,8 @@ void app_main()
     hoja_register_button_callback(local_button_cb);
     hoja_register_analog_callback(local_analog_cb);
     hoja_register_event_callback(local_event_cb);
+
+    xTaskCreate(local_get_battery_task, "BatTask", 2048, NULL, 3, &local_battery_TaskHandle);
 
     err = hoja_init();
 }

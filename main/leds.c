@@ -4,7 +4,8 @@
 rgb_s led_colors[CONFIG_NP_RGB_COUNT] = {0};
 led_anim_status_t led_anim_status = LA_STATUS_IDLE;
 
-rgb_s mode_color = {0};
+rgb_s mode_color    = {0};
+rgb_s charge_color  = COLOR_GREEN;
 
 TaskHandle_t led_taskHandle;
 QueueHandle_t led_xQueue;
@@ -96,6 +97,7 @@ void led_animator_task(void * params)
 
     rgb_s blinkfrom_color = {0};
     rgb_s blinkto_color = {0};
+    uint32_t blink_speed = 10;
 
     // Used to determine if blink should keep repeating.
     bool blinking_en = false;
@@ -130,7 +132,7 @@ void led_animator_task(void * params)
                 rgb_setall(current_color);
                 rgb_show();
                 fader += 1;
-                vTaskDelay(10/portTICK_PERIOD_MS);
+                vTaskDelay(blink_speed/portTICK_PERIOD_MS);
             }
             last_color.rgb = next_color.rgb;
             rgb_setall(next_color);
@@ -154,7 +156,7 @@ void led_animator_task(void * params)
                 rgb_setall(current_color);
                 rgb_show();
                 fader += 1;
-                vTaskDelay(10/portTICK_PERIOD_MS);
+                vTaskDelay(blink_speed/portTICK_PERIOD_MS);
             }
             last_color.rgb = next_color.rgb;
             rgb_setall(next_color);
@@ -184,6 +186,7 @@ void led_animator_task(void * params)
                     // not before we store our original color
                     blinkfrom_color.rgb = current_color.rgb;
                     blinkto_color.rgb = msg_color.rgb;
+                    blink_speed = 10;
                     blinking_en = true;
                     break;
 
@@ -191,6 +194,7 @@ void led_animator_task(void * params)
 
                     uint8_t fader = 0;
                     next_color.rgb = msg_color.rgb;
+                    blink_speed = 10;
                     while(fader < 30)
                     {
                         uint8_t t = 0;
@@ -212,6 +216,16 @@ void led_animator_task(void * params)
                     rgb_setall(next_color);
                     rgb_show();
 
+                    break;
+
+                case LEDANIM_BATTERY_BREATHE:
+                    // Here we need to blink TO the desired color
+                    // not before we store our original color
+                    blink_speed = 30;
+                    blinkfrom_color.rgb = COLOR_BLACK.rgb;
+                    blinkto_color.rgb = msg_color.rgb;
+
+                    blinking_en = true;
                     break;
             }
         }
