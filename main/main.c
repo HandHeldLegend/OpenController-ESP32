@@ -83,7 +83,7 @@ TaskHandle_t local_battery_TaskHandle = NULL;
 // Bool to store whether we should do LED charging update
 bool charge_display = false;
 
-#define VOLTAGE_MAX_READ 2315
+#define VOLTAGE_MAX_READ 2350
 #define VOLTAGE_MIN_READ VOLTAGE_MAX_READ-255
 void local_get_battery_task(void * params)
 {
@@ -92,6 +92,7 @@ void local_get_battery_task(void * params)
     for(;;)
     {
         int lvl = adc1_get_raw(ADC_BATTERY_LVL);
+        //ESP_LOGI(TAG, "%d", (unsigned int) lvl);
         lvl = lvl - VOLTAGE_MIN_READ;
         
         if (lvl > 255)
@@ -104,7 +105,7 @@ void local_get_battery_task(void * params)
         }
         uint8_t out_lvl = 255-lvl;
 
-        ESP_LOGI(TAG, "%d", (unsigned int) out_lvl);
+        //ESP_LOGI(TAG, "%d", (unsigned int) out_lvl);
 
         hoja_set_battery_lvl(out_lvl);
 
