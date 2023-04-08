@@ -107,7 +107,7 @@ void local_get_battery_task(void * params)
 
         //ESP_LOGI(TAG, "%d", (unsigned int) out_lvl);
 
-        hoja_set_battery_lvl(out_lvl);
+        hoja_set_battery_level(out_lvl);
 
         vTaskDelay(1500/portTICK_PERIOD_MS);
     }
@@ -425,7 +425,7 @@ void local_usb_evt(hoja_usb_event_t evt)
     {
         default:
         case HEVT_USB_DISCONNECTED:
-            if (util_battery_external_power())
+            if (util_battery_has_external_power())
             {
                 charge_display = true;
                 led_animator_send(LEDANIM_BATTERY_BREATHE, charge_color);
@@ -532,7 +532,6 @@ void local_charger_evt(hoja_charger_event_t evt)
     {
         case HEVT_CHARGER_PLUGGED:
             ESP_LOGI(TAG, "Charger plugged in.");
-            hoja_set_external_power(true);
             if(charge_display)
             {
                 led_animator_send(LEDANIM_BATTERY_BREATHE, charge_color);
@@ -653,7 +652,7 @@ void local_boot_evt(hoja_boot_event_t evt)
             vTaskDelay(200/portTICK_PERIOD_MS);
             if(charge_display)
             {
-                util_battery_status_t stat = util_get_battery_charging_status();
+                uint8_t stat = util_battery_get_charging_status();
                 if ((stat == BATSTATUS_UNDEFINED) || (stat == BATSTATUS_NOTCHARGING))
                 {
                     charge_color.rgb = COLOR_RED.rgb;
