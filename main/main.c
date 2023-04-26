@@ -318,14 +318,23 @@ void local_system_evt(hoja_system_event_t evt, uint8_t param)
                     hoja_settings_saveall();
                 }
             }
-            
-            // Get boot mode and it will perform a callback.
-            err = util_battery_boot_status();
-            if (err != HOJA_OK)
+
+            if (loaded_settings.controller_mode == HOJA_CONTROLLER_MODE_RETRO)
             {
-                ESP_LOGE(TAG, "Issue when getting boot battery status.");
+                ESP_LOGI(TAG, "Starting N64 Cold boot operation...");
+                core_joybus_n64_coldboot();
+                util_battery_set_charge_rate(35);
             }
 
+            else
+            {
+                // Get boot mode and it will perform a callback.
+                err = util_battery_boot_status();
+                if (err != HOJA_OK)
+                {
+                    ESP_LOGE(TAG, "Issue when getting boot battery status.");
+                }
+            }
         }
             break;
         
@@ -458,28 +467,37 @@ void local_wired_evt(hoja_wired_event_t evt)
         
         case HEVT_WIRED_SNES_DETECT:
             hoja_set_core(HOJA_CORE_SNES);
+            led_animator_send(LEDANIM_FADETO, COLOR_BLACK);
+            vTaskDelay(100/portTICK_PERIOD_MS);
             led_animator_send(LEDANIM_FADETO, COLOR_WHITE);
             err = hoja_start_core();
-
             break;
 
-        case HEVT_WIRED_JOYBUS_DETECT:
-            hoja_set_core(HOJA_CORE_GC);
+        case HEVT_WIRED_N64_DETECT:
+            led_animator_send(LEDANIM_FADETO, COLOR_TEAL);
+            break;
+
+        case HEVT_WIRED_N64_DECONFIRMED:
+            err = util_wired_detect_loop();
+            if (!err)
+            {
+                ESP_LOGI(TAG, "Started wired retro loop OK.");
+                led_animator_send(LEDANIM_BLINK, COLOR_ORANGE);
+            }
+            else
+            {
+                ESP_LOGE(TAG, "Failed to start wired retro loop.");
+            }
+            break;
+
+        case HEVT_WIRED_GAMECUBE_DETECT:
+            hoja_set_core(HOJA_CORE_GAMECUBE);
+            led_animator_send(LEDANIM_FADETO, COLOR_BLACK);
+            vTaskDelay(100/portTICK_PERIOD_MS);
             led_animator_send(LEDANIM_FADETO, COLOR_PURPLE);
             err = hoja_start_core();
 
             break;
-    }
-
-    if (err != HOJA_OK)
-    {
-        ESP_LOGE(TAG, "Failed to start retro core.");
-        enter_sleep();
-    }
-    else
-    {
-        ESP_LOGI(TAG, "Started retro core OK.");
-        rgb_show();
     }
 }
 
@@ -565,17 +583,6 @@ void local_boot_evt(hoja_boot_event_t evt)
                 {
                     charge_display = false;
                     util_battery_set_charge_rate(35);
-
-                    err = util_wired_detect_loop();
-                    if (!err)
-                    {
-                        ESP_LOGI(TAG, "Started wired retro loop OK.");
-                        led_animator_send(LEDANIM_BLINK, COLOR_ORANGE);
-                    }
-                    else
-                    {
-                        ESP_LOGE(TAG, "Failed to start wired retro loop.");
-                    }   
                 }
                     break;
 
