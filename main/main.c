@@ -470,10 +470,13 @@ void local_wired_evt(hoja_wired_event_t evt)
             led_animator_send(LEDANIM_FADETO, COLOR_BLACK);
             vTaskDelay(100/portTICK_PERIOD_MS);
             led_animator_send(LEDANIM_FADETO, COLOR_WHITE);
+            
             err = hoja_start_core();
             break;
 
         case HEVT_WIRED_N64_DETECT:
+            hoja_load_remap(joybus_map.val);
+            hoja_set_dpad_mode(DPAD_MODE_ANALOGONLY);
             led_animator_send(LEDANIM_FADETO, COLOR_TEAL);
             break;
 
@@ -495,6 +498,8 @@ void local_wired_evt(hoja_wired_event_t evt)
             led_animator_send(LEDANIM_FADETO, COLOR_BLACK);
             vTaskDelay(100/portTICK_PERIOD_MS);
             led_animator_send(LEDANIM_FADETO, COLOR_PURPLE);
+            hoja_load_remap(joybus_map.val);
+            hoja_set_dpad_mode(DPAD_MODE_ANALOGONLY);
             err = hoja_start_core();
 
             break;
