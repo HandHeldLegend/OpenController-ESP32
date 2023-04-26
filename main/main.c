@@ -256,8 +256,9 @@ void local_analog_cb()
     hoja_analog_data.rs_x = 2048;
     hoja_analog_data.rs_y = 2048;
 
-    hoja_analog_data.lt_a = 0;
-    hoja_analog_data.rt_a = 0;
+    // Set analog triggers
+    hoja_analog_data.lt_a = (hoja_processed_buttons.trigger_zl) ? DPAD_ANALOG_POS : 0;
+    hoja_analog_data.rt_a = (hoja_processed_buttons.trigger_zr) ? DPAD_ANALOG_POS : 0;
 }
 
 // Handle System events
@@ -870,6 +871,8 @@ void app_main()
     hoja_register_button_callback(local_button_cb);
     hoja_register_analog_callback(local_analog_cb);
     hoja_register_event_callback(local_event_cb);
+    hoja_button_remap_enable(true);
+    hoja_load_remap(0x00);
 
     xTaskCreate(local_get_battery_task, "BatTask", 2048, NULL, 3, &local_battery_TaskHandle);
 
